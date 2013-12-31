@@ -54,6 +54,16 @@ const (
     DemoBanjo
 )
 
+// Note is a single MIDI-style note to be played by the Create.
+//
+// Tone is the MIDI tone value.  Values < 31 or > 127 are treated as rest (silent) tones.
+//
+// Duration is the duration of the note in units of 1/64 of a second.
+type Note struct {
+    Tone     byte
+    Duration byte
+}
+
 func (s *simpleCommand) Assemble() []byte {
     return append([]byte{s.Opcode}, s.Payload...)
 }
@@ -145,7 +155,7 @@ func AbortDemo() Command {
     return &simpleCommand{Opcode: 136, Payload: []byte{255}}
 }
 
-// Drive generates the "Drive" command tell the Create to move with a given velocity and
+// Drive generates the "Drive" command to tell the Create to move with a given velocity
 // turn radius.  The velocity must be in the range -500 to 500 mm/s, and the radius in
 // the range -2000 to 2000 mm.
 func Drive(velocity int16, radius int16) Command {
@@ -160,7 +170,7 @@ func Drive(velocity int16, radius int16) Command {
     return &simpleCommand{Opcode: 137, Payload: payload}
 }
 
-// DriveStraight generates the "Drive" command tell the Create to move with a given
+// DriveStraight generates the "Drive" command to tell the Create to move with a given
 // velocity in a straight line.  The velocity must be in the range -500 to 500 mm/s.
 func DriveStraight(velocity int16) Command {
     if velocity < -500 || velocity > 500 {
@@ -171,7 +181,7 @@ func DriveStraight(velocity int16) Command {
     return &simpleCommand{Opcode: 137, Payload: payload}
 }
 
-// Spin generates the "Drive" command tell the Create to spin on the spot with a given
+// Spin generates the "Drive" command to tell the Create to spin on the spot with a given
 // velocity.  The velocity must be in the range -500 to 500 mm/s.
 func Spin(velocity int16, clockwise bool) Command {
     if velocity < -500 || velocity > 500 {
@@ -187,7 +197,7 @@ func Spin(velocity int16, clockwise bool) Command {
     return &simpleCommand{Opcode: 137, Payload: payload}
 }
 
-// DriveDirect generates the "Drive Direct" command give the Create differential drive
+// DriveDirect generates the "Drive Direct" command to give the Create differential drive
 // commands.  The left and right velocities must each be in the range of -500 to 500
 // mm/s.
 func DriveDirect(right int16, left int16) Command {
@@ -202,7 +212,7 @@ func DriveDirect(right int16, left int16) Command {
     return &simpleCommand{Opcode: 145, Payload: payload}
 }
 
-// Leds generates the "LEDs" command set the states of the onboard LEDs.
+// Leds generates the "LEDs" command to set the states of the onboard LEDs.
 func Leds(advance bool, play bool, powerColour byte, powerIntensity byte) Command {
     var bits byte = 0x00
     if advance {
@@ -213,4 +223,65 @@ func Leds(advance bool, play bool, powerColour byte, powerIntensity byte) Comman
     }
     payload := []byte{bits, powerColour, powerIntensity}
     return &simpleCommand{Opcode: 139, Payload: payload}
+}
+
+// DigitalOutputs generates the "Digital Outputs" command to set the state of each of the
+// Create's three digital output pins.
+func DigitalOutputs(bits byte) Command {
+    if bits > 0x07 {
+        return nil
+    }
+
+    payload := []byte{bits}
+    return &simpleCommand{Opcode: 147, Payload: payload}
+}
+
+// PwmLowSideDrivers generates the "PWM Low Side Drivers" command to set the PWM state of
+// each of the Create's three low side drivers, with 0 being a duty cycle of 0% and 128
+// being a duty cycle of 100%.
+func PwmLowSideDrivers(driver0 byte, driver1 byte, driver2 byte) Command {
+    if driver0 > 128 || driver1 > 128 || driver2 > 128 {
+        return nil
+    }
+
+    payload := []byte{driver2, driver1, driver0}
+    return &simpleCommand{Opcode: 144, Payload: payload}
+}
+
+// SendIr generates the "Send IR" command to use the Create's low side driver 1 to send
+// a byte in a format suitable for reception by a Create's IR receiver.  External
+// circuitry must be attached to the driver pin for this to work, as described in the
+// manual.
+func SendIr(value byte) Command {
+    payload := []byte{value}
+    return &simpleCommand{Opcode: 151, Payload: payload}
+}
+
+// Song generates the "Song" command, which programs one of 16 different songs into the
+// Create for playback at a later time.  Each song can be up to 16 notes long.
+func Song(number byte, song []Note) Command {
+    if number > 15 {
+        return nil
+    }
+    length := byte(len(song))
+    if length < 1 || length > 16 {
+        return nil
+    }
+
+    payload := []byte{number, length}
+    for _, n := range song {
+        payload = append(payload, n.Tone, n.Duration)
+    }
+    return &simpleCommand{Opcode: 140, Payload: payload}
+}
+
+// PlaySong generates the "Play Song" command, which plays a song that was previously
+// programmed using the Song command.
+func PlaySong(number byte) Command {
+    if number > 15 {
+        return nil
+    }
+
+    payload := []byte{number}
+    return &simpleCommand{Opcode: 141, Payload: payload}
 }
