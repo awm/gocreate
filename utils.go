@@ -112,3 +112,41 @@ func Sequence(start interface{}, stop interface{}, step interface{}) interface{}
 
     return vresult.Interface()
 }
+
+func Sum(slice interface{}) interface{} {
+    vslice := reflect.ValueOf(slice)
+    if vslice.Kind() != reflect.Slice || vslice.Len() == 0 {
+        return nil
+    }
+
+    titems := vslice.Index(0).Type()
+    vresult := reflect.New(titems).Elem()
+
+    var incr func(vi reflect.Value)
+    switch titems.Kind() {
+    case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+        incr = func(vi reflect.Value) {
+            vresult.SetInt(vresult.Int() + vi.Int())
+        }
+    case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+        incr = func(vi reflect.Value) {
+            vresult.SetUint(vresult.Uint() + vi.Uint())
+        }
+    case reflect.Float32, reflect.Float64:
+        incr = func(vi reflect.Value) {
+            vresult.SetFloat(vresult.Float() + vi.Float())
+        }
+    default:
+        return nil
+    }
+
+    for i := 0; i < vslice.Len(); i++ {
+        vi := vslice.Index(i)
+        if vi.Kind() != titems.Kind() {
+            return nil
+        }
+        incr(vi)
+    }
+
+    return vresult.Interface()
+}
